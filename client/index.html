@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trajectory Visualizer</title>
+  <style>
+    :root {
+      --primary: #007acc;
+      --background: #f4f6f8;
+      --obstacle: #e74c3c;
+      --trajectory: #2c3e50;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: var(--background);
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      text-align: center;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    label {
+      font-weight: 500;
+    }
+
+    input[type="number"],
+    input[type="text"] {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 100%;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    canvas {
+      display: block;
+      margin: 30px auto 0;
+      background-color: #ffffff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      color: #888;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🧭 Coverage Trajectory Visualizer</h2>
+
+    <form id="inputForm">
+      <label>Wall Width (m): <input type="number" id="wallWidth" value="5" step="0.1" required></label>
+      <label>Wall Height (m): <input type="number" id="wallHeight" value="5" step="0.1" required></label>
+      <label>Obstacles (format: x,y,width,height; separate multiple with |):</label>
+      <input type="text" id="obstacles" placeholder="e.g. 1,1,0.25,0.25|2.5,2.5,0.5,0.5">
+
+      <button type="submit">Generate Trajectory</button>
+    </form>
+
+    <canvas id="canvas" width="500" height="500"></canvas>
+  </div>
+
+  <div class="footer">
+    © 2025 BE Intern Coverage Planner Demo
+  </div>
+
+  <script>
+    document.getElementById("inputForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const wallWidth = parseFloat(document.getElementById("wallWidth").value);
+      const wallHeight = parseFloat(document.getElementById("wallHeight").value);
+      const obstaclesRaw = document.getElementById("obstacles").value;
+
+      const obstacles = obstaclesRaw
+        .split("|")
+        .filter(Boolean)
+        .map(str => str.split(",").map(Number));
+
+      fetch('/trajectory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wall_width: wallWidth,
+          wall_height: wallHeight,
+          obstacles: obstacles
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scale = 100; // 1m = 100px
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw obstacles
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--obstacle');
+        obstacles.forEach(([x, y, w, h]) => {
+          ctx.fillRect(x * scale, y * scale, w * scale, h * scale);
+        });
+
+        // Draw trajectory
+        const trajectory = data.trajectory;
+        let i = 0;
+
+        function drawStep() {
+          if (i >= trajectory.length) return;
+          const [x, y] = trajectory[i++];
+          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--trajectory');
+          ctx.fillRect(x * scale, y * scale, 2, 2);
+          requestAnimationFrame(drawStep);
+        }
+
+        drawStep();
+      })
+      .catch(err => {
+        alert("API error: " + err.message);
+        console.error(err);
+      });
+    });
+  </script>
+</body>
+</html>
